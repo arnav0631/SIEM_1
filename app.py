@@ -45,10 +45,10 @@ def index():
             total_alerts=total_alerts,
             status=status,
             status_class=status_class,
-            active_rules=ACTIVE_RULES
+            active_rules=ACTIVE_RULES,
+            rules=ACTIVE_RULES  # Passed both ways so templates looking for 'rules' or 'active_rules' work!
         )
     except Exception as e:
-        # Fallback render if database returns unexpected data structure
         return f"Database error encountered: {str(e)}", 500
 
 @app.route('/generate')

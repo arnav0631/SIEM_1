@@ -93,6 +93,7 @@
         .btn-primary { background: #2563eb; border-color: #3b82f6; }
         .btn-primary:hover { background: #1d4ed8; }
         .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger-red); border-color: var(--danger-red); }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.4); }
 
         .panel {
             background: var(--card-bg);
@@ -178,14 +179,15 @@
             <h1>🛡️ Enterprise SOC Telemetry Hub</h1>
         </div>
         <div>
-            <span class="status-badge {% if soc_status == 'SECURE' %}status-secure{% else %}status-attack{% endif %}">
-                System Status: {{ soc_status }}
+            <span class="status-badge {% if status_class %}{{ status_class }}{% elif soc_status == 'SECURE' %}status-secure{% else %}status-attack{% endif %}">
+                {% if status %}{{ status }}{% else %}System Status: {{ soc_status }}{% endif %}
             </span>
         </div>
     </div>
 
     <div class="action-bar">
         <a href="/generate" class="btn btn-primary">⚡ Ingest Event Stream</a>
+        <a href="/reset" class="btn btn-danger" onclick="return confirm('Reset all telemetry logs and alerts back to zero?');">🔄 Reset Telemetry (0)</a>
         <a href="/export/logs" class="btn">📥 Export Telemetry Log (CSV)</a>
     </div>
 
@@ -203,7 +205,8 @@
     <div class="panel">
         <h2>⚙️ SOAR Correlation Rules Control Panel</h2>
         <div class="rule-grid">
-            {% for rule, active in rules.items() %}
+            {% set active_rules_dict = rules if rules is defined else active_rules %}
+            {% for rule, active in active_rules_dict.items() %}
             <div class="rule-card">
                 <span><strong>{{ rule.upper() }}</strong></span>
                 <a href="/toggle_rule/{{ rule }}" 
@@ -228,6 +231,10 @@
                     <td><code>{{ alert[1] }}</code></td>
                     <td>{{ alert[2] }}</td>
                     <td><span class="badge {{ alert[3] }}">{{ alert[3] }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="empty-cell">No active security alerts detected in current stream.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -268,8 +275,12 @@
                     <td>{{ log[0] }}</td>
                     <td><code>{{ log[1] }}</code></td>
                     <td>{{ log[2] }}</td>
-                    <td>{{ log[3] }}</td>
+                    <td><code>{{ log[3] }}</code></td>
                     <td><span class="badge {{ log[4] }}">{{ log[4] }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="empty-cell">Telemetry stream empty. Click 'Ingest Event Stream' to begin.</td>
                 </tr>
                 {% endfor %}
             </tbody>
