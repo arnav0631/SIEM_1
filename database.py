@@ -2,14 +2,21 @@ import sqlite3
 
 DB_NAME = "siem.db"
 
+def get_connection():
+    return sqlite3.connect(DB_NAME)
+
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    # Table for raw logs
+    # Wipe old tables on initialization so telemetry starts fresh at 0
+    cursor.execute("DROP TABLE IF EXISTS logs")
+    cursor.execute("DROP TABLE IF EXISTS alerts")
+    cursor.execute("DROP TABLE IF EXISTS blocked_ips")
+    
+    # Create fresh schema
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             ip TEXT,
             user TEXT,
@@ -18,10 +25,8 @@ def init_db():
         )
     ''')
     
-    # Table for security alerts
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             ip TEXT,
             attack_type TEXT,
@@ -29,11 +34,9 @@ def init_db():
         )
     ''')
     
-    # Table for blocked IPs
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS blocked_ips (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ip TEXT UNIQUE,
+            ip TEXT PRIMARY KEY,
             timestamp TEXT
         )
     ''')
@@ -42,46 +45,44 @@ def init_db():
     conn.close()
 
 def add_log(timestamp, ip, user, event, severity):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO logs (timestamp, ip, user, event, severity) VALUES (?, ?, ?, ?, ?)",
-                   (timestamp, ip, user, event, severity))
+    cursor.execute("INSERT INTO logs VALUES (?, ?, ?, ?, ?)", (timestamp, ip, user, event, severity))
     conn.commit()
     conn.close()
 
 def add_alert(timestamp, ip, attack_type, severity):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO alerts (timestamp, ip, attack_type, severity) VALUES (?, ?, ?, ?)",
-                   (timestamp, ip, attack_type, severity))
+    cursor.execute("INSERT INTO alerts VALUES (?, ?, ?, ?)", (timestamp, ip, attack_type, severity))
     conn.commit()
     conn.close()
 
 def block_ip(ip, timestamp):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO blocked_ips (ip, timestamp) VALUES (?, ?)", (ip, timestamp))
+    cursor.execute("INSERT OR IGNORE INTO blocked_ips VALUES (?, ?)", (ip, timestamp))
     conn.commit()
     conn.close()
 
 def unblock_ip(ip):
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM blocked_ips WHERE ip = ?", (ip,))
     conn.commit()
     conn.close()
 
 def get_dashboard_data():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT timestamp, ip, user, event, severity FROM logs ORDER BY id DESC LIMIT 10")
+    cursor.execute("SELECT * FROM logs ORDER BY rowid DESC LIMIT 10")
     logs = cursor.fetchall()
     
-    cursor.execute("SELECT timestamp, ip, attack_type, severity FROM alerts ORDER BY id DESC LIMIT 5")
+    cursor.execute("SELECT * FROM alerts ORDER BY rowid DESC LIMIT 5")
     alerts = cursor.fetchall()
     
-    cursor.execute("SELECT ip, timestamp FROM blocked_ips ORDER BY id DESC")
+    cursor.execute("SELECT * FROM blocked_ips")
     blocked = cursor.fetchall()
     
     cursor.execute("SELECT COUNT(*) FROM logs")
