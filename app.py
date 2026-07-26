@@ -5,7 +5,6 @@ from modules import generate_logs, detector
 
 app = Flask(__name__)
 
-# Global state for interactive SOAR detection rules
 ACTIVE_RULES = {
     'BRUTE_FORCE': True,
     'POWERSHELL': True,
@@ -13,43 +12,39 @@ ACTIVE_RULES = {
     'ANOMALY_SPIKE': True
 }
 
-# Initialize database schema on startup
 database.init_db()
 
 @app.route('/')
 def index():
-    try:
-        logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
-        
-        # Check SOC status (System status reverts to SECURE if no alerts in last 60 seconds)
-        recent_threat = False
-        now = datetime.now()
-        for alert in alerts:
-            try:
-                alert_time = datetime.strptime(alert[0], "%Y-%m-%d %H:%M:%S")
-                if (now - alert_time) <= timedelta(seconds=60):
-                    recent_threat = True
-                    break
-            except Exception:
-                pass
+    logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
+    
+    recent_threat = False
+    now = datetime.now()
+    for alert in alerts:
+        try:
+            alert_time = datetime.strptime(alert[0], "%Y-%m-%d %H:%M:%S")
+            if (now - alert_time) <= timedelta(seconds=60):
+                recent_threat = True
+                break
+        except Exception:
+            pass
 
-        status = "UNDER ATTACK" if recent_threat else "SYSTEM STATUS: SECURE"
-        status_class = "status-danger" if recent_threat else "status-secure"
+    status = "UNDER ATTACK" if recent_threat else "SYSTEM STATUS: SECURE"
+    status_class = "status-attack" if recent_threat else "status-secure"
 
-        return render_template(
-            'index.html',
-            logs=logs,
-            alerts=alerts,
-            blocked=blocked,
-            total_logs=total_logs,
-            total_alerts=total_alerts,
-            status=status,
-            status_class=status_class,
-            active_rules=ACTIVE_RULES,
-            rules=ACTIVE_RULES  # Passed both ways so templates looking for 'rules' or 'active_rules' work!
-        )
-    except Exception as e:
-        return f"Database error encountered: {str(e)}", 500
+    return render_template(
+        'index.html',
+        logs=logs,
+        alerts=alerts,
+        blocked=blocked,
+        total_logs=total_logs,
+        total_alerts=total_alerts,
+        status=status,
+        status_class=status_class,
+        soc_status="UNDER ATTACK" if recent_threat else "SECURE",
+        rules=ACTIVE_RULES,
+        active_rules=ACTIVE_RULES
+    )
 
 @app.route('/generate')
 def generate():
@@ -57,6 +52,11 @@ def generate():
     for log in new_logs:
         database.add_log(log['timestamp'], log['ip'], log['user'], log['event'], log['severity'])
         detector.analyze_log(log, ACTIVE_RULES)
+    return redirect(url_for('index'))
+
+@app.route('/reset')
+def reset():
+    database.init_db()
     return redirect(url_for('index'))
 
 @app.route('/toggle_rule/<rule_name>')
