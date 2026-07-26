@@ -17,7 +17,7 @@ ACTIVE_RULES = {
 # Initialize database schema on startup
 database.init_db()
 
-@app.route('/')
+@app.route('/', methods=['GET', 'HEAD'])
 def index():
     # If opened in a new browser window/tab, reset database to start at 0
     if 'visited' not in session:
