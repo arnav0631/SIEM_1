@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, Response, request
+from flask import Flask, render_template, redirect, url_for, Response
 from datetime import datetime, timedelta
 import database
 from modules import generate_logs, detector
@@ -16,12 +16,8 @@ ACTIVE_RULES = {
 # Initialize database schema on startup
 database.init_db()
 
-@app.route('/', methods=['GET', 'HEAD'])
+@app.route('/')
 def index():
-    # Handle Render health checks immediately without touching DB or templates
-    if request.method == 'HEAD':
-        return Response(status=200)
-
     logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
     
     # Check SOC status (System status reverts to SECURE if no alerts in last 60 seconds)
@@ -59,12 +55,6 @@ def generate():
         database.add_log(log['timestamp'], log['ip'], log['user'], log['event'], log['severity'])
         # Evaluate log through correlation engine
         detector.analyze_log(log, ACTIVE_RULES)
-    return redirect(url_for('index'))
-
-@app.route('/reset')
-def reset():
-    # Explicitly clear all database logs, alerts, and blocked IPs back to 0
-    database.init_db()
     return redirect(url_for('index'))
 
 @app.route('/toggle_rule/<rule_name>')
