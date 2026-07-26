@@ -9,7 +9,7 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Wipe old tables on initialization so telemetry starts fresh at 0
+    # Wipe old tables so telemetry starts clean at 0 for fresh sessions
     cursor.execute("DROP TABLE IF EXISTS logs")
     cursor.execute("DROP TABLE IF EXISTS alerts")
     cursor.execute("DROP TABLE IF EXISTS blocked_ips")
