@@ -1,58 +1,22 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import database
 
-ACTIVE_RULES = {
-    "brute_force": True,
-    "powershell": True,
-    "port_scan": True,
-    "anomaly_spike": True
-}
+def analyze_log(log, active_rules):
+    timestamp = log.get('timestamp')
+    ip = log.get('ip')
+    event = log.get('event', '')
+    severity = log.get('severity')
 
-failed_attempts = {}
-log_volume_tracker = {}
+    # 1. PowerShell Execution Detection Rule
+    if active_rules.get('POWERSHELL') and "4104" in event:
+        database.add_alert(timestamp, ip, "Suspicious PowerShell Execution", "CRITICAL")
+        database.block_ip(ip, timestamp)
 
-def toggle_rule(rule_name, status):
-    if rule_name in ACTIVE_RULES:
-        ACTIVE_RULES[rule_name] = status
+    # 2. Port Scan Detection Rule
+    elif active_rules.get('PORT_SCAN') and "8001" in event:
+        database.add_alert(timestamp, ip, "Reconnaissance Port Scan", "HIGH")
+        database.block_ip(ip, timestamp)
 
-def check_rules(timestamp_str, ip, user, event):
-    current_time = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-
-    # 1. TIME-WINDOW BRUTE FORCE DETECTION (30s)
-    if ACTIVE_RULES["brute_force"] and event == "LOGIN_FAILED":
-        if ip not in failed_attempts:
-            failed_attempts[ip] = []
-        
-        failed_attempts[ip].append(current_time)
-        cutoff_time = current_time - timedelta(seconds=30)
-        failed_attempts[ip] = [t for t in failed_attempts[ip] if t >= cutoff_time]
-
-        if len(failed_attempts[ip]) >= 3:
-            database.add_alert(timestamp_str, ip, "Brute Force Attack Detected", "CRITICAL")
-            database.block_ip(ip, timestamp_str)  # SOAR Action: Auto Block IP
-            failed_attempts[ip] = []
-
-    # 2. CRITICAL FILE ACCESS (SOAR Auto Ban)
-    elif event == "UNAUTHORIZED_FILE_ACCESS":
-        database.add_alert(timestamp_str, ip, "Unauthorized File Access Attempt", "CRITICAL")
-        database.block_ip(ip, timestamp_str)  # SOAR Action: Auto Block IP
-
-    # 3. LOG SPIKE ANOMALY DETECTION (10s)
-    if ACTIVE_RULES["anomaly_spike"]:
-        if ip not in log_volume_tracker:
-            log_volume_tracker[ip] = []
-            
-        log_volume_tracker[ip].append(current_time)
-        cutoff_spike = current_time - timedelta(seconds=10)
-        log_volume_tracker[ip] = [t for t in log_volume_tracker[ip] if t >= cutoff_spike]
-
-        if len(log_volume_tracker[ip]) >= 5:
-            database.add_alert(timestamp_str, ip, "Anomaly Detected: High Log Volume Spike", "HIGH")
-            log_volume_tracker[ip] = []
-
-    # 4. PATTERN MATCHING RULES
-    if ACTIVE_RULES["powershell"] and event == "POWERSHELL_EXEC":
-        database.add_alert(timestamp_str, ip, "Suspicious PowerShell Execution", "HIGH")
-
-    if ACTIVE_RULES["port_scan"] and event == "PORT_SCAN":
-        database.add_alert(timestamp_str, ip, "Port Scanning Activity", "HIGH")
+    # 3. Brute Force / Failed Logon Detection Rule
+    elif active_rules.get('BRUTE_FORCE') and "4625" in event:
+        database.add_alert(timestamp, ip, "Brute Force Authentication Attempt", "HIGH")
