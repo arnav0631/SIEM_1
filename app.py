@@ -1,10 +1,9 @@
-from flask import Flask, render_template, redirect, url_for, Response, session, request
+from flask import Flask, render_template, redirect, url_for, Response, request
 from datetime import datetime, timedelta
 import database
 from modules import generate_logs, detector
 
 app = Flask(__name__)
-app.secret_key = 'siem_secret_session_key'  # Required for Flask session management
 
 # Global state for interactive SOAR detection rules
 ACTIVE_RULES = {
@@ -19,14 +18,9 @@ database.init_db()
 
 @app.route('/', methods=['GET', 'HEAD'])
 def index():
-    # Handle Render health checks immediately for HEAD requests
+    # Handle Render health checks immediately without touching DB or templates
     if request.method == 'HEAD':
         return Response(status=200)
-
-    # If opened in a new browser window/tab, reset database to start at 0
-    if 'visited' not in session:
-        database.init_db()
-        session['visited'] = True
 
     logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
     
@@ -65,6 +59,12 @@ def generate():
         database.add_log(log['timestamp'], log['ip'], log['user'], log['event'], log['severity'])
         # Evaluate log through correlation engine
         detector.analyze_log(log, ACTIVE_RULES)
+    return redirect(url_for('index'))
+
+@app.route('/reset')
+def reset():
+    # Explicitly clear all database logs, alerts, and blocked IPs back to 0
+    database.init_db()
     return redirect(url_for('index'))
 
 @app.route('/toggle_rule/<rule_name>')
