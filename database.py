@@ -80,10 +80,12 @@ def get_dashboard_data():
     blocked = cursor.fetchall()
     
     cursor.execute("SELECT COUNT(*) FROM logs")
-    total_logs = cursor.fetchone()[0]
+    total_logs_result = cursor.fetchone()
+    total_logs = total_logs_result[0] if total_logs_result else 0
     
     cursor.execute("SELECT COUNT(*) FROM alerts")
-    total_alerts = cursor.fetchone()[0]
+    total_alerts_result = cursor.fetchone()
+    total_alerts = total_alerts_result[0] if total_alerts_result else 0
     
     conn.close()
     return logs, alerts, blocked, total_logs, total_alerts

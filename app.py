@@ -18,42 +18,44 @@ database.init_db()
 
 @app.route('/')
 def index():
-    logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
-    
-    # Check SOC status (System status reverts to SECURE if no alerts in last 60 seconds)
-    recent_threat = False
-    now = datetime.now()
-    for alert in alerts:
-        try:
-            alert_time = datetime.strptime(alert[0], "%Y-%m-%d %H:%M:%S")
-            if (now - alert_time) <= timedelta(seconds=60):
-                recent_threat = True
-                break
-        except Exception:
-            pass
+    try:
+        logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
+        
+        # Check SOC status (System status reverts to SECURE if no alerts in last 60 seconds)
+        recent_threat = False
+        now = datetime.now()
+        for alert in alerts:
+            try:
+                alert_time = datetime.strptime(alert[0], "%Y-%m-%d %H:%M:%S")
+                if (now - alert_time) <= timedelta(seconds=60):
+                    recent_threat = True
+                    break
+            except Exception:
+                pass
 
-    status = "UNDER ATTACK" if recent_threat else "SYSTEM STATUS: SECURE"
-    status_class = "status-danger" if recent_threat else "status-secure"
+        status = "UNDER ATTACK" if recent_threat else "SYSTEM STATUS: SECURE"
+        status_class = "status-danger" if recent_threat else "status-secure"
 
-    return render_template(
-        'index.html',
-        logs=logs,
-        alerts=alerts,
-        blocked=blocked,
-        total_logs=total_logs,
-        total_alerts=total_alerts,
-        status=status,
-        status_class=status_class,
-        active_rules=ACTIVE_RULES
-    )
+        return render_template(
+            'index.html',
+            logs=logs,
+            alerts=alerts,
+            blocked=blocked,
+            total_logs=total_logs,
+            total_alerts=total_alerts,
+            status=status,
+            status_class=status_class,
+            active_rules=ACTIVE_RULES
+        )
+    except Exception as e:
+        # Fallback render if database returns unexpected data structure
+        return f"Database error encountered: {str(e)}", 500
 
 @app.route('/generate')
 def generate():
-    # Generate batch of 5 synthetic telemetry events
     new_logs = generate_logs.generate_batch(5)
     for log in new_logs:
         database.add_log(log['timestamp'], log['ip'], log['user'], log['event'], log['severity'])
-        # Evaluate log through correlation engine
         detector.analyze_log(log, ACTIVE_RULES)
     return redirect(url_for('index'))
 
@@ -71,8 +73,6 @@ def unblock(ip):
 @app.route('/export/logs')
 def export_logs():
     logs, _, _, _, _ = database.get_dashboard_data()
-    
-    # Build CSV text output
     csv_data = "Timestamp,IP Address,User ID,Event Code,Severity\n"
     for log in logs:
         csv_data += f'"{log[0]}","{log[1]}","{log[2]}","{log[3]}","{log[4]}"\n'
