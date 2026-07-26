@@ -5,6 +5,7 @@ from modules import generate_logs, detector
 
 app = Flask(__name__)
 
+# Global state for interactive SOAR detection rules
 ACTIVE_RULES = {
     'BRUTE_FORCE': True,
     'POWERSHELL': True,
@@ -12,12 +13,14 @@ ACTIVE_RULES = {
     'ANOMALY_SPIKE': True
 }
 
+# Initialize database schema on startup
 database.init_db()
 
 @app.route('/')
 def index():
     logs, alerts, blocked, total_logs, total_alerts = database.get_dashboard_data()
     
+    # Check SOC status (System status reverts to SECURE if no alerts in last 60 seconds)
     recent_threat = False
     now = datetime.now()
     for alert in alerts:
@@ -29,7 +32,7 @@ def index():
         except Exception:
             pass
 
-    status = "UNDER ATTACK" if recent_threat else "SYSTEM STATUS: SECURE"
+    status_str = "UNDER ATTACK" if recent_threat else "SECURE"
     status_class = "status-attack" if recent_threat else "status-secure"
 
     return render_template(
@@ -39,24 +42,19 @@ def index():
         blocked=blocked,
         total_logs=total_logs,
         total_alerts=total_alerts,
-        status=status,
+        soc_status=status_str,
         status_class=status_class,
-        soc_status="UNDER ATTACK" if recent_threat else "SECURE",
-        rules=ACTIVE_RULES,
-        active_rules=ACTIVE_RULES
+        rules=ACTIVE_RULES
     )
 
 @app.route('/generate')
 def generate():
+    # Generate batch of 5 synthetic telemetry events
     new_logs = generate_logs.generate_batch(5)
     for log in new_logs:
         database.add_log(log['timestamp'], log['ip'], log['user'], log['event'], log['severity'])
+        # Evaluate log through correlation engine
         detector.analyze_log(log, ACTIVE_RULES)
-    return redirect(url_for('index'))
-
-@app.route('/reset')
-def reset():
-    database.init_db()
     return redirect(url_for('index'))
 
 @app.route('/toggle_rule/<rule_name>')
@@ -73,6 +71,8 @@ def unblock(ip):
 @app.route('/export/logs')
 def export_logs():
     logs, _, _, _, _ = database.get_dashboard_data()
+    
+    # Build CSV text output
     csv_data = "Timestamp,IP Address,User ID,Event Code,Severity\n"
     for log in logs:
         csv_data += f'"{log[0]}","{log[1]}","{log[2]}","{log[3]}","{log[4]}"\n'
