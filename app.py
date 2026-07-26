@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, Response, session
+from flask import Flask, render_template, redirect, url_for, Response, session, request
 from datetime import datetime, timedelta
 import database
 from modules import generate_logs, detector
@@ -19,6 +19,10 @@ database.init_db()
 
 @app.route('/', methods=['GET', 'HEAD'])
 def index():
+    # Handle Render health checks immediately for HEAD requests
+    if request.method == 'HEAD':
+        return Response(status=200)
+
     # If opened in a new browser window/tab, reset database to start at 0
     if 'visited' not in session:
         database.init_db()
