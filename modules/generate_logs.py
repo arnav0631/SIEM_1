@@ -2,7 +2,7 @@ import random
 from datetime import datetime
 
 IP_POOL = ["192.168.1.10", "10.0.0.15", "172.16.0.5", "192.168.1.50", "45.33.32.156"]
-USER_POOL = ["admin", "root", "Arnav", "service_acc", "guest"]
+USER_POOL = ["admin", "root", "Arnav", "service", "guest"]
 EVENT_CODES = [
     {"code": "4624", "severity": "INFO", "desc": "Successful Logon"},
     {"code": "4625", "severity": "HIGH", "desc": "Failed Logon"},
